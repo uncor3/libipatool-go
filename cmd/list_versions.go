@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/avast/retry-go"
@@ -59,11 +60,12 @@ func ListVersionsCmd() *cobra.Command {
 					return err
 				}
 
-				dependencies.Logger.Log().
-					Interface("externalVersionIdentifiers", out.ExternalVersionIdentifiers).
-					Str("bundleID", app.BundleID).
-					Bool("success", true).
-					Send()
+				fmt.Println(out)
+				// dependencies.Logger.Log().
+				// 	Interface("externalVersionIdentifiers", out.ExternalVersionIdentifiers).
+				// 	Str("bundleID", app.BundleID).
+				// 	Bool("success", true).
+				// 	Send()
 
 				return nil
 			},

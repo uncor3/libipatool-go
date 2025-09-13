@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/avast/retry-go"
@@ -63,13 +64,13 @@ func getVersionMetadataCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-
-				dependencies.Logger.Log().
-					Str("externalVersionID", externalVersionID).
-					Str("displayVersion", out.DisplayVersion).
-					Time("releaseDate", out.ReleaseDate).
-					Bool("success", true).
-					Send()
+				fmt.Println(out)
+				// dependencies.Logger.Log().
+				// 	Str("externalVersionID", externalVersionID).
+				// 	Str("displayVersion", out.DisplayVersion).
+				// 	Time("releaseDate", out.ReleaseDate).
+				// 	Bool("success", true).
+				// 	Send()
 
 				return nil
 			},

@@ -1,83 +1,56 @@
 package cmd
 
 import (
-	"errors"
-	"reflect"
+	"log"
 
 	"github.com/majd/ipatool/v2/pkg/appstore"
-	"github.com/spf13/cobra"
-	"github.com/thediveo/enumflag/v2"
-	"golang.org/x/net/context"
+	ipatoolhttp "github.com/majd/ipatool/v2/pkg/http"
+	"github.com/majd/ipatool/v2/pkg/keychain"
+	"github.com/majd/ipatool/v2/pkg/util/machine"
+	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
 )
 
 var version = "dev"
+var dependencies = Dependencies{}
+var keychainPassphrase string
 
-func rootCmd() *cobra.Command {
-	var (
-		verbose        bool
-		nonInteractive bool
-		format         OutputFormat
-	)
-
-	cmd := &cobra.Command{
-		Use:           "ipatool",
-		Short:         "A cli tool for interacting with Apple's ipa files",
-		SilenceErrors: true,
-		SilenceUsage:  true,
-		Version:       version,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			ctx := context.WithValue(context.Background(), "interactive", !nonInteractive)
-			cmd.SetContext(ctx)
-			initWithCommand(cmd)
-		},
-	}
-
-	cmd.PersistentFlags().VarP(
-		enumflag.New(&format, "format", map[OutputFormat][]string{
-			OutputFormatText: {"text"},
-			OutputFormatJSON: {"json"},
-		}, enumflag.EnumCaseSensitive), "format", "", "sets output format for command; can be 'text', 'json'")
-	cmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "enables verbose logs")
-	cmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "", false, "run in non-interactive session")
-	cmd.PersistentFlags().StringVar(&keychainPassphrase, "keychain-passphrase", "", "passphrase for unlocking keychain")
-
-	cmd.AddCommand(authCmd())
-	cmd.AddCommand(downloadCmd())
-	cmd.AddCommand(purchaseCmd())
-	cmd.AddCommand(searchCmd())
-	cmd.AddCommand(ListVersionsCmd())
-	cmd.AddCommand(getVersionMetadataCmd())
-
-	return cmd
+type Dependencies struct {
+	Logger    log.Logger
+	OS        operatingsystem.OperatingSystem
+	Machine   machine.Machine
+	CookieJar ipatoolhttp.CookieJar
+	Keychain  keychain.Keychain
+	AppStore  appstore.AppStore
 }
 
-// Execute runs the program and returns the appropriate exit status code.
-func Execute() int {
-	cmd := rootCmd()
-	err := cmd.Execute()
+// Initialize initializes the library dependencies
+func Initialize() error {
+	verbose := false
+	nonInteractive := true
+	format := OutputFormatJSON
 
-	if err != nil {
-		if reflect.ValueOf(dependencies).IsZero() {
-			initWithCommand(cmd)
-		}
+	initDependencies(verbose, nonInteractive, format)
+	return nil
+}
 
-		var appstoreErr *appstore.Error
-		if errors.As(err, &appstoreErr) {
-			dependencies.Logger.Verbose().Stack().
-				Err(err).
-				Interface("metadata", appstoreErr.Metadata).
-				Send()
-		} else {
-			dependencies.Logger.Verbose().Stack().Err(err).Send()
-		}
+// Cleanup cleans up library resources
+func Cleanup() {
+	// Clean up any resources if needed
+	dependencies = Dependencies{}
+}
 
-		dependencies.Logger.Error().
-			Err(err).
-			Bool("success", false).
-			Send()
+func initDependencies(verbose, nonInteractive bool, format OutputFormat) {
+	// dependencies.Logger = newLogger(format, verbose)
+	dependencies.OS = operatingsystem.New()
+	dependencies.Machine = machine.New(machine.Args{OS: dependencies.OS})
+	dependencies.CookieJar = newCookieJar(dependencies.Machine)
+	dependencies.Keychain = newKeychain(dependencies.Machine, nil, !nonInteractive)
+	dependencies.AppStore = appstore.NewAppStore(appstore.Args{
+		CookieJar:       dependencies.CookieJar,
+		OperatingSystem: dependencies.OS,
+		Keychain:        dependencies.Keychain,
+		Machine:         dependencies.Machine,
+	})
 
-		return 1
-	}
-
-	return 0
+	createConfigDirectory(dependencies.OS, dependencies.Machine)
 }

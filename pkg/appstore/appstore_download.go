@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/majd/ipatool/v2/pkg/http"
-	"github.com/schollz/progressbar/v3"
 	"howett.net/plist"
 )
 
@@ -22,7 +21,7 @@ type DownloadInput struct {
 	Account           Account
 	App               App
 	OutputPath        string
-	Progress          *progressbar.ProgressBar
+	Progress          ProgressCallback
 	ExternalVersionID string
 }
 
@@ -38,14 +37,12 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
-
 	req := t.downloadRequest(input.Account, input.App, guid, input.ExternalVersionID)
 
 	res, err := t.downloadClient.Send(req)
 	if err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to send http request: %w", err)
 	}
-
 	if res.Data.FailureType == FailureTypePasswordTokenExpired {
 		return DownloadOutput{}, ErrPasswordTokenExpired
 	}
@@ -114,7 +111,7 @@ type downloadResult struct {
 	Items           []downloadItemResult `plist:"songList,omitempty"`
 }
 
-func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressBar) error {
+func (t *appstore) downloadFile(src, dst string, progress ProgressCallback) error {
 	req, err := t.httpClient.NewRequest("GET", src, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -142,20 +139,28 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 	}
 	defer res.Body.Close()
 
+	totalSize := res.ContentLength + stat.Size()
+	currentSize := stat.Size()
+
+	// Seek to end of file for resuming downloads
+	_, err = file.Seek(0, io.SeekEnd)
+	if err != nil {
+		return fmt.Errorf("can not seek file: %w", err)
+	}
+
 	if progress != nil {
-		progress.ChangeMax64(res.ContentLength + stat.Size())
-		err = progress.Set64(stat.Size())
+		// Call progress callback with initial values
+		progress(currentSize, totalSize)
 
-		if err != nil {
-			return fmt.Errorf("can not set bar progress: %w", err)
+		// Create a custom writer that calls the progress callback
+		writer := &progressWriter{
+			writer:   file,
+			current:  currentSize,
+			total:    totalSize,
+			callback: progress,
 		}
 
-		_, err = file.Seek(0, io.SeekEnd)
-		if err != nil {
-			return fmt.Errorf("can not seek file: %w", err)
-		}
-
-		_, err = io.Copy(io.MultiWriter(file, progress), res.Body)
+		_, err = io.Copy(writer, res.Body)
 	} else {
 		_, err = io.Copy(file, res.Body)
 	}
@@ -165,6 +170,28 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 	}
 
 	return nil
+}
+
+// Custom writer that tracks progress
+type progressWriter struct {
+	writer   io.Writer
+	current  int64
+	total    int64
+	callback ProgressCallback
+}
+
+func (pw *progressWriter) Write(p []byte) (int, error) {
+	n, err := pw.writer.Write(p)
+	if err != nil {
+		return n, err
+	}
+
+	pw.current += int64(n)
+	if pw.callback != nil {
+		pw.callback(pw.current, pw.total)
+	}
+
+	return n, nil
 }
 
 func (*appstore) downloadRequest(acc Account, app App, guid string, externalVersionID string) http.Request {

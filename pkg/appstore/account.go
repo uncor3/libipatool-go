@@ -8,3 +8,5 @@ type Account struct {
 	StoreFront          string `json:"storeFront,omitempty"`
 	Password            string `json:"password,omitempty"`
 }
+
+type ProgressCallback func(current, total int64)
