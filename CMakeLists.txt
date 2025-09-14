@@ -4,25 +4,26 @@ project(ipatool-go)
 # Find Go compiler
 find_program(GO_EXECUTABLE go REQUIRED)
 
-# Set Go build flags for dynamic library
+# Set Go build flags for static library
 set(GO_BUILD_FLAGS 
-    -buildmode=c-shared
+    -buildmode=c-archive
+    -ldflags "-s -w"
 )
 
 # Define the Go source file
 set(GO_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/main.go)
 
 # Define output files
-set(GO_LIB_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/libipatool-go.so)
+set(GO_LIB_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/libipatool-go.a)
 set(GO_HEADER_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/libipatool-go.h)
 
-# Custom command to build Go shared library
+# Custom command to build Go static library
 add_custom_command(
     OUTPUT ${GO_LIB_OUTPUT} ${GO_HEADER_OUTPUT}
     COMMAND ${GO_EXECUTABLE} build ${GO_BUILD_FLAGS} -o ${GO_LIB_OUTPUT} ${GO_SOURCE}
     DEPENDS ${GO_SOURCE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Building Go shared library"
+    COMMENT "Building Go static library"
 )
 
 # Create a custom target for the Go library
@@ -31,7 +32,7 @@ add_custom_target(go_build ALL
 )
 
 # Create an imported library target
-add_library(ipatool-go SHARED IMPORTED GLOBAL)
+add_library(ipatool-go STATIC IMPORTED GLOBAL)
 set_target_properties(ipatool-go PROPERTIES
     IMPORTED_LOCATION ${GO_LIB_OUTPUT}
     INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR}
