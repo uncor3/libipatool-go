@@ -37,6 +37,11 @@ set_target_properties(ipatool-go PROPERTIES
     IMPORTED_LOCATION ${GO_LIB_OUTPUT}
     INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR}
 )
+if(APPLE)
+    target_link_libraries(ipatool-go INTERFACE
+        "-framework Security"
+    )
+endif()
 
 # Make sure the Go library is built before the imported target is used
 add_dependencies(ipatool-go go_build)
