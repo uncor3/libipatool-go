@@ -20,6 +20,7 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"unsafe"
 
 	"github.com/majd/ipatool/v2/cmd"
@@ -28,12 +29,18 @@ import (
 var initialized bool
 
 //export IpaToolInitialize
-func IpaToolInitialize() C.int {
+func IpaToolInitialize(backends *C.char) C.int {
 	if initialized {
 		return 0
 	}
 
-	err := cmd.Initialize()
+	goBackends := C.GoString(backends)
+	enabledBackends := []string{}
+	if goBackends != "" {
+		enabledBackends = append(enabledBackends, splitAndTrim(goBackends, ",")...)
+	}
+
+	err := cmd.Initialize(enabledBackends)
 	if err != nil {
 		return -1
 	}
@@ -171,6 +178,18 @@ func IpaToolDownloadApp(bundleID *C.char, outputPath *C.char, externalVersionID 
 //export SetKeyChainPassphrase
 func SetKeyChainPassphrase(passphrase *C.char) {
 	cmd.KeychainPassphrase = C.GoString(passphrase)
+}
+
+func splitAndTrim(s, sep string) []string {
+	parts := strings.Split(s, sep)
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		t := strings.TrimSpace(p)
+		if t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func main() {}

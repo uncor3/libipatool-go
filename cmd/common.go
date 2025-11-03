@@ -15,23 +15,42 @@ import (
 
 var KeychainPassphrase = ""
 
-// newCookieJar returns a new cookie jar instance.
 func newCookieJar(machine machine.Machine) http.CookieJar {
 	return util.Must(cookiejar.New(&cookiejar.Options{
 		Filename: filepath.Join(machine.HomeDirectory(), ConfigDirectoryName, CookieJarFileName),
 	}))
 }
 
-// newKeychain returns a new keychain instance.
-func newKeychain(machine machine.Machine) keychain.Keychain {
-	ring := util.Must(keyring.Open(keyring.Config{
-		AllowedBackends: []keyring.BackendType{
-			keyring.KeychainBackend,
-			keyring.SecretServiceBackend,
+func newKeychain(machine machine.Machine, enabledBackends []string) keychain.Keychain {
+
+	for _, backend := range enabledBackends {
+		println("Enabled keychain backend: %s\n", backend)
+	}
+
+	allowedBackends := []keyring.BackendType{}
+	for _, backend := range enabledBackends {
+		switch backend {
+		case "keychain":
+			allowedBackends = append(allowedBackends, keyring.KeychainBackend)
+		case "secret-service":
+			allowedBackends = append(allowedBackends, keyring.SecretServiceBackend)
+		case "wincred":
+			allowedBackends = append(allowedBackends, keyring.WinCredBackend)
+		case "file":
+			allowedBackends = append(allowedBackends, keyring.FileBackend)
+		}
+	}
+
+	if len(allowedBackends) == 0 {
+		allowedBackends = []keyring.BackendType{
 			keyring.FileBackend,
-		},
-		ServiceName: KeychainServiceName,
-		FileDir:     filepath.Join(machine.HomeDirectory(), ConfigDirectoryName),
+		}
+	}
+
+	ring := util.Must(keyring.Open(keyring.Config{
+		AllowedBackends: allowedBackends,
+		ServiceName:     KeychainServiceName,
+		FileDir:         filepath.Join(machine.HomeDirectory(), ConfigDirectoryName),
 		FilePasswordFunc: func(s string) (string, error) {
 			return KeychainPassphrase, nil
 		},
@@ -40,7 +59,6 @@ func newKeychain(machine machine.Machine) keychain.Keychain {
 	return keychain.New(keychain.Args{Keyring: ring})
 }
 
-// createConfigDirectory creates the configuration directory for the CLI tool, if needed.
 func createConfigDirectory(os operatingsystem.OperatingSystem, machine machine.Machine) error {
 	configDirectoryPath := filepath.Join(machine.HomeDirectory(), ConfigDirectoryName)
 	_, err := os.Stat(configDirectoryPath)

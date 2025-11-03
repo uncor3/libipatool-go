@@ -18,12 +18,12 @@ type Dependencies struct {
 	AppStore  appstore.AppStore
 }
 
-func Initialize() error {
+func Initialize(backends []string) error {
 	verbose := false
 	nonInteractive := true
 	format := OutputFormatJSON
 
-	initDependencies(verbose, nonInteractive, format)
+	initDependencies(verbose, nonInteractive, format, backends)
 	return nil
 }
 
@@ -32,11 +32,11 @@ func Cleanup() {
 	dependencies = Dependencies{}
 }
 
-func initDependencies(verbose, nonInteractive bool, format OutputFormat) {
+func initDependencies(verbose, nonInteractive bool, format OutputFormat, backends []string) {
 	dependencies.OS = operatingsystem.New()
 	dependencies.Machine = machine.New(machine.Args{OS: dependencies.OS})
 	dependencies.CookieJar = newCookieJar(dependencies.Machine)
-	dependencies.Keychain = newKeychain(dependencies.Machine)
+	dependencies.Keychain = newKeychain(dependencies.Machine, backends)
 	dependencies.AppStore = appstore.NewAppStore(appstore.Args{
 		CookieJar:       dependencies.CookieJar,
 		OperatingSystem: dependencies.OS,
