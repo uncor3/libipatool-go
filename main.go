@@ -168,4 +168,9 @@ func IpaToolDownloadApp(bundleID *C.char, outputPath *C.char, externalVersionID 
 	return 0
 }
 
+//export SetKeyChainPassphrase
+func SetKeyChainPassphrase(passphrase *C.char) {
+	cmd.KeychainPassphrase = C.GoString(passphrase)
+}
+
 func main() {}

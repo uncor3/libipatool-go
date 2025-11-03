@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/majd/ipatool/v2/pkg/appstore"
 	ipatoolhttp "github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
@@ -10,12 +8,9 @@ import (
 	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
 )
 
-var version = "dev"
 var dependencies = Dependencies{}
-var keychainPassphrase string
 
 type Dependencies struct {
-	Logger    log.Logger
 	OS        operatingsystem.OperatingSystem
 	Machine   machine.Machine
 	CookieJar ipatoolhttp.CookieJar
@@ -23,7 +18,6 @@ type Dependencies struct {
 	AppStore  appstore.AppStore
 }
 
-// Initialize initializes the library dependencies
 func Initialize() error {
 	verbose := false
 	nonInteractive := true
@@ -33,18 +27,16 @@ func Initialize() error {
 	return nil
 }
 
-// Cleanup cleans up library resources
+// TODO: implement
 func Cleanup() {
-	// Clean up any resources if needed
 	dependencies = Dependencies{}
 }
 
 func initDependencies(verbose, nonInteractive bool, format OutputFormat) {
-	// dependencies.Logger = newLogger(format, verbose)
 	dependencies.OS = operatingsystem.New()
 	dependencies.Machine = machine.New(machine.Args{OS: dependencies.OS})
 	dependencies.CookieJar = newCookieJar(dependencies.Machine)
-	dependencies.Keychain = newKeychain(dependencies.Machine, nil, !nonInteractive)
+	dependencies.Keychain = newKeychain(dependencies.Machine)
 	dependencies.AppStore = appstore.NewAppStore(appstore.Args{
 		CookieJar:       dependencies.CookieJar,
 		OperatingSystem: dependencies.OS,

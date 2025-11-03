@@ -2,38 +2,18 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 
 	"github.com/99designs/keyring"
 	cookiejar "github.com/juju/persistent-cookiejar"
 	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
-	"github.com/majd/ipatool/v2/pkg/log"
 	"github.com/majd/ipatool/v2/pkg/util"
 	"github.com/majd/ipatool/v2/pkg/util/machine"
 	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
-	"github.com/rs/zerolog"
 )
 
-// newLogger returns a new logger instance.
-func newLogger(format OutputFormat, verbose bool) log.Logger {
-	var writer io.Writer
-
-	switch format {
-	case OutputFormatJSON:
-		writer = zerolog.SyncWriter(os.Stdout)
-	case OutputFormatText:
-		writer = log.NewWriter()
-	}
-
-	return log.NewLogger(log.Args{
-		Verbose: verbose,
-		Writer:  writer,
-	},
-	)
-}
+var KeychainPassphrase = ""
 
 // newCookieJar returns a new cookie jar instance.
 func newCookieJar(machine machine.Machine) http.CookieJar {
@@ -43,54 +23,22 @@ func newCookieJar(machine machine.Machine) http.CookieJar {
 }
 
 // newKeychain returns a new keychain instance.
-func newKeychain(machine machine.Machine, logger log.Logger, interactive bool) keychain.Keychain {
+func newKeychain(machine machine.Machine) keychain.Keychain {
 	ring := util.Must(keyring.Open(keyring.Config{
 		AllowedBackends: []keyring.BackendType{
-			// keyring.KeychainBackend,
-			// keyring.SecretServiceBackend,
+			keyring.KeychainBackend,
+			keyring.SecretServiceBackend,
 			keyring.FileBackend,
 		},
 		ServiceName: KeychainServiceName,
 		FileDir:     filepath.Join(machine.HomeDirectory(), ConfigDirectoryName),
 		FilePasswordFunc: func(s string) (string, error) {
-			return "", nil
-			// TODO: implement
-			// if keychainPassphrase == "" && !interactive {
-			// 	return "", errors.New("keychain passphrase is required when not running in interactive mode")
-			// }
-
-			// if keychainPassphrase != "" {
-			// 	return keychainPassphrase, nil
-			// }
-
-			// // For library usage, return empty string if no passphrase provided
-			// return "", errors.New("keychain passphrase required but not provided")
+			return KeychainPassphrase, nil
 		},
 	}))
 
 	return keychain.New(keychain.Args{Keyring: ring})
 }
-
-// // initWithCommand initializes the dependencies of the command.
-// func initWithCommand(cmd *cobra.Command) {
-// 	verbose := cmd.Flag("verbose").Value.String() == "true"
-// 	interactive, _ := cmd.Context().Value("interactive").(bool)
-// 	format := util.Must(OutputFormatFromString(cmd.Flag("format").Value.String()))
-
-// 	dependencies.Logger = newLogger(format, verbose)
-// 	dependencies.OS = operatingsystem.New()
-// 	dependencies.Machine = machine.New(machine.Args{OS: dependencies.OS})
-// 	dependencies.CookieJar = newCookieJar(dependencies.Machine)
-// 	dependencies.Keychain = newKeychain(dependencies.Machine, dependencies.Logger, interactive)
-// 	dependencies.AppStore = appstore.NewAppStore(appstore.Args{
-// 		CookieJar:       dependencies.CookieJar,
-// 		OperatingSystem: dependencies.OS,
-// 		Keychain:        dependencies.Keychain,
-// 		Machine:         dependencies.Machine,
-// 	})
-
-// 	util.Must("", createConfigDirectory(dependencies.OS, dependencies.Machine))
-// }
 
 // createConfigDirectory creates the configuration directory for the CLI tool, if needed.
 func createConfigDirectory(os operatingsystem.OperatingSystem, machine machine.Machine) error {
