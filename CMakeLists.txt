@@ -2,7 +2,19 @@ cmake_minimum_required(VERSION 3.16)
 project(ipatool-go)
 
 # Find Go compiler
-find_program(GO_EXECUTABLE go REQUIRED)
+find_program(GO_EXECUTABLE go)
+
+# If not found in PATH, check common Windows location as a fallback
+if(NOT GO_EXECUTABLE AND WIN32)
+    find_program(GO_EXECUTABLE go PATHS "C:/msys64/mingw64/bin" NO_DEFAULT_PATH)
+endif()
+
+# If still not found, fail the configuration
+if(NOT GO_EXECUTABLE)
+    message(FATAL_ERROR "Go compiler (go.exe) not found.")
+else()
+    message(STATUS "Found Go compiler: ${GO_EXECUTABLE}")
+endif()
 
 # Set Go build flags for static library
 set(GO_BUILD_FLAGS 
