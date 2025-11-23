@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -9,7 +10,7 @@ import (
 	"github.com/majd/ipatool/v2/pkg/appstore"
 )
 
-func DownloadApp(bundleID, outputPath, externalVersionID string, acquireLicense bool, progressCallback appstore.ProgressCallback) error {
+func DownloadApp(ctx context.Context, bundleID, outputPath, externalVersionID string, acquireLicense bool, progressCallback appstore.ProgressCallback) error {
 	if bundleID == "" {
 		return errors.New("bundle identifier must be specified")
 	}
@@ -50,10 +51,16 @@ func DownloadApp(bundleID, outputPath, externalVersionID string, acquireLicense 
 				return err
 			}
 		}
-
-		// TODO: progress
+		//sometimes we get the error below even though acquireLicense is true
+		//Error in dependencies.AppStore.Download license is required
 		out, err := dependencies.AppStore.Download(appstore.DownloadInput{
-			Account: acc, App: app, OutputPath: outputPath, Progress: progressCallback, ExternalVersionID: externalVersionID})
+			Context:           ctx,
+			Account:           acc,
+			App:               app,
+			OutputPath:        outputPath,
+			Progress:          progressCallback,
+			ExternalVersionID: externalVersionID,
+		})
 		if err != nil {
 			fmt.Println("Error in dependencies.AppStore.Download", err)
 			return err
@@ -66,6 +73,7 @@ func DownloadApp(bundleID, outputPath, externalVersionID string, acquireLicense 
 
 		return nil
 	},
+		retry.Context(ctx),
 		retry.LastErrorOnly(true),
 		retry.DelayType(retry.FixedDelay),
 		retry.Delay(time.Millisecond),

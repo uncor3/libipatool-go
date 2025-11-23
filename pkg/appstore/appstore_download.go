@@ -2,6 +2,7 @@ package appstore
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ var (
 )
 
 type DownloadInput struct {
+	Context           context.Context
 	Account           Account
 	App               App
 	OutputPath        string
@@ -77,7 +79,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		return DownloadOutput{}, fmt.Errorf("failed to resolve destination path: %w", err)
 	}
 
-	err = t.downloadFile(item.URL, fmt.Sprintf("%s.tmp", destination), input.Progress)
+	err = t.downloadFile(input.Context, item.URL, fmt.Sprintf("%s.tmp", destination), input.Progress)
 	if err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to download file: %w", err)
 	}
@@ -111,8 +113,8 @@ type downloadResult struct {
 	Items           []downloadItemResult `plist:"songList,omitempty"`
 }
 
-func (t *appstore) downloadFile(src, dst string, progress ProgressCallback) error {
-	req, err := t.httpClient.NewRequest("GET", src, nil)
+func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress ProgressCallback) error {
+	req, err := t.httpClient.NewRequestWithContext(ctx, "GET", src, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -166,6 +168,9 @@ func (t *appstore) downloadFile(src, dst string, progress ProgressCallback) erro
 	}
 
 	if err != nil {
+		if ctx.Err() == context.Canceled {
+			return context.Canceled
+		}
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 

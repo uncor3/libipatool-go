@@ -16,17 +16,20 @@ static void call_progress_callback(ProgressCallbackFunc callback, long long curr
 }
 */
 import "C"
-
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"unsafe"
 
 	"github.com/majd/ipatool/v2/cmd"
 )
 
 var initialized bool
+var downloadCancels = make(map[string]context.CancelFunc)
+var cancelsMutex = &sync.Mutex{}
 
 //export IpaToolInitialize
 func IpaToolInitialize(backends *C.char) C.int {
@@ -148,6 +151,20 @@ func IpaToolRevokeCredentials() C.int {
 	return 0
 }
 
+//export IpaToolCancelDownload
+func IpaToolCancelDownload(bundleID *C.char) {
+	goBundleID := C.GoString(bundleID)
+
+	cancelsMutex.Lock()
+	defer cancelsMutex.Unlock()
+
+	if cancel, ok := downloadCancels[goBundleID]; ok {
+		fmt.Println("Cancelling download for", goBundleID)
+		cancel()
+		delete(downloadCancels, goBundleID)
+	}
+}
+
 //export IpaToolDownloadApp
 func IpaToolDownloadApp(bundleID *C.char, outputPath *C.char, externalVersionID *C.char, acquireLicense C.int, onProgress C.ProgressCallbackFunc, userData unsafe.Pointer) C.int {
 	if !initialized {
@@ -157,7 +174,19 @@ func IpaToolDownloadApp(bundleID *C.char, outputPath *C.char, externalVersionID 
 	goBundleID := C.GoString(bundleID)
 	goOutputPath := C.GoString(outputPath)
 	goExternalVersionID := C.GoString(externalVersionID)
-	// goAcquireLicense := acquireLicense != 0
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	cancelsMutex.Lock()
+	downloadCancels[goBundleID] = cancel
+	cancelsMutex.Unlock()
+
+	defer func() {
+		cancelsMutex.Lock()
+		delete(downloadCancels, goBundleID)
+		cancelsMutex.Unlock()
+		cancel()
+	}()
 
 	var progressCallback func(int64, int64)
 	if onProgress != nil {
@@ -166,9 +195,12 @@ func IpaToolDownloadApp(bundleID *C.char, outputPath *C.char, externalVersionID 
 		}
 	}
 
-	err := cmd.DownloadApp(goBundleID, goOutputPath, goExternalVersionID, true, progressCallback)
-	fmt.Println(err)
+	err := cmd.DownloadApp(ctx, goBundleID, goOutputPath, goExternalVersionID, true, progressCallback)
 	if err != nil {
+		if err == context.Canceled {
+			fmt.Println("Download cancelled:", goBundleID)
+			return 1
+		}
 		return -1
 	}
 

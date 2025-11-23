@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ type Client[R interface{}] interface {
 	Send(request Request) (Result[R], error)
 	Do(req *http.Request) (*http.Response, error)
 	NewRequest(method, url string, body io.Reader) (*http.Request, error)
+	NewRequestWithContext(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
 }
 
 type client[R interface{}] struct {
@@ -123,6 +125,15 @@ func (*client[R]) NewRequest(method, url string, body io.Reader) (*http.Request,
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	return req, nil
+}
+
+func (*client[R]) NewRequestWithContext(ctx context.Context, method, url string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request with context: %w", err)
 	}
 
 	return req, nil
