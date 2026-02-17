@@ -7,6 +7,7 @@ type Account struct {
 	Name                string `json:"name,omitempty"`
 	StoreFront          string `json:"storeFront,omitempty"`
 	Password            string `json:"password,omitempty"`
+	Pod                 string `json:"pod,omitempty"`
 }
 
 type ProgressCallback func(current, total int64)

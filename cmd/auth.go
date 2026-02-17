@@ -33,10 +33,16 @@ func Login(email, password, authCode string, authCodeCallback AuthCodeCallback) 
 			}
 		}
 
-		_, err := dependencies.AppStore.Login(appstore.LoginInput{
+		bag, err := dependencies.AppStore.Bag(appstore.BagInput{})
+		if err != nil {
+			return fmt.Errorf("failed to get bag: %w", err)
+		}
+
+		_, err = dependencies.AppStore.Login(appstore.LoginInput{
 			Email:    email,
 			Password: password,
 			AuthCode: currentAuthCode,
+			Endpoint: bag.AuthEndpoint,
 		})
 		if err != nil {
 			return err
