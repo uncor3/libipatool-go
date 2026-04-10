@@ -207,6 +207,17 @@ func IpaToolDownloadApp(bundleID *C.char, outputPath *C.char, externalVersionID 
 	return 0
 }
 
+//export IpaToolGetDownloadedFilePath
+func IpaToolGetDownloadedFilePath(bundleID *C.char) *C.char {
+	if !initialized {
+		return C.CString("")
+	}
+
+	goBundleID := C.GoString(bundleID)
+	path := cmd.GetLastDownloadPath(goBundleID)
+	return C.CString(path)
+}
+
 //export SetKeyChainPassphrase
 func SetKeyChainPassphrase(passphrase *C.char) {
 	cmd.KeychainPassphrase = C.GoString(passphrase)

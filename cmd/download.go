@@ -4,11 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/avast/retry-go"
 	"github.com/majd/ipatool/v2/pkg/appstore"
 )
+
+var (
+	downloadPathMu sync.Mutex
+	downloadPaths  = map[string]string{}
+)
+
+// returns the last downloaded IPA path for a bundle id
+func GetLastDownloadPath(bundleID string) string {
+	downloadPathMu.Lock()
+	defer downloadPathMu.Unlock()
+	return downloadPaths[bundleID]
+}
 
 func DownloadApp(ctx context.Context, bundleID, outputPath, externalVersionID string, acquireLicense bool, progressCallback appstore.ProgressCallback) error {
 	if bundleID == "" {
@@ -70,6 +83,10 @@ func DownloadApp(ctx context.Context, bundleID, outputPath, externalVersionID st
 		if err != nil {
 			return err
 		}
+
+		downloadPathMu.Lock()
+		downloadPaths[bundleID] = out.DestinationPath
+		downloadPathMu.Unlock()
 
 		return nil
 	},
